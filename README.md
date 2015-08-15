@@ -1,4 +1,3 @@
-Go Libvterm
-===========
+# go-libvterm
 
-A wrapper to use libvterm from Go.
+A golang wrapper for libvterm.
