@@ -1,9 +1,9 @@
 package main
 
 /*
-   #cgo CFLAGS: -I/home/fede/tmp/test-libvterm/include
-   #cgo LDFLAGS: /home/fede/tmp/test-libvterm/libtest.a
-   #include </home/fede/tmp/test-libvterm/include/vterm.h>
+   #cgo CFLAGS: -I./libvterm/
+   #cgo LDFLAGS: ./libvterm/libvterm.a
+   #include "vterm.h"
    typedef int (*callback_fcn1)(VTermRect, void*);
    int screenDamage(VTermRect r, void *u); // Forward declaration.
 */

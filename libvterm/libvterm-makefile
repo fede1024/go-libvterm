@@ -1,0 +1,38 @@
+override CFLAGS +=-Wall -Iinclude -std=c99 -fPIC
+
+ifeq ($(DEBUG),1)
+  override CFLAGS +=-ggdb -DDEBUG
+endif
+
+ifeq ($(PROFILE),1)
+  override CFLAGS +=-pg
+  override LDFLAGS+=-pg
+endif
+
+CFILES=$(wildcard src/*.c)
+HFILES=$(wildcard include/*.h)
+OBJECTS=$(CFILES:.c=.lo)
+LIBRARY=libvterm.a
+
+TBLFILES=$(wildcard src/encoding/*.tbl)
+INCFILES=$(TBLFILES:.tbl=.inc)
+
+HFILES_INT=$(wildcard src/*.h) $(HFILES)
+
+all: $(LIBRARY)
+
+$(LIBRARY): $(OBJECTS)
+	ar rcs $@ $^
+
+src/%.lo: src/%.c $(HFILES_INT)
+	$(CC) $(CFLAGS) -o $@ -c $<
+
+src/encoding/%.inc: src/encoding/%.tbl
+	perl -CSD tbl2inc_c.pl $< >$@
+
+src/encoding.lo: $(INCFILES)
+
+.PHONY: clean
+clean:
+	rm -f $(OBJECTS) $(INCFILES)
+	rm -f t/harness.lo t/harness
