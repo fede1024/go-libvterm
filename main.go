@@ -11,41 +11,89 @@ package main
 */
 import "C"
 
-import "fmt"
-import "reflect"
-import "unsafe"
+import (
+	"fmt"
+	"time"
+	"unsafe"
+)
+
+type TermPos struct {
+	row int
+	col int
+}
+
+type TermRect struct {
+	start_row int
+	start_col int
+	end_row   int
+	end_col   int
+}
+
+type Term struct {
+	damage     chan (TermRect)
+	cursorMove chan (TermPos)
+	inputStr   chan (string)
+	stop       chan (int)
+}
+
+//var term Term
 
 //export screenDamage
 func screenDamage(rect C.VTermRect, user unsafe.Pointer) C.int {
-	fmt.Printf("damage %d..%d,%d..%d\n", rect.start_row, rect.end_row, rect.start_col, rect.end_col)
+	term := (*Term)(user)
+	term.damage <- TermRect{(int)(rect.start_row), (int)(rect.start_col),
+		(int)(rect.end_row), (int)(rect.end_col)}
+
 	return 0
 }
 
 //export moveCursor
 func moveCursor(pos C.VTermPos, oldPos C.VTermPos, visible C.int, user unsafe.Pointer) C.int {
-	fmt.Printf("move cursor %d %d\n", pos.row, pos.col)
+	term := (*Term)(user)
+	term.cursorMove <- TermPos{(int)(pos.row), (int)(pos.col)}
 	return 0
 }
 
 func main() {
 	fmt.Printf("CREATE\n")
 
-	var cbs C.VTermScreenCallbacks
+	term := Term{make(chan TermRect), make(chan TermPos), make(chan string),
+		make(chan int)}
 
+	var cbs C.VTermScreenCallbacks
 	cbs.damage = (C.screenDamage_type)(unsafe.Pointer(C.screenDamage))
 	cbs.movecursor = (C.moveCursor_type)(unsafe.Pointer(C.moveCursor))
+
+	go func() {
+		for {
+			select {
+			case rect := <-term.damage:
+				fmt.Printf("damage: %d\n", rect)
+			case pos := <-term.cursorMove:
+				fmt.Printf("move cursor: %d\n", pos)
+			case <-term.stop:
+				fmt.Printf("stop\n")
+				return
+			}
+		}
+	}()
 
 	vt := C.vterm_new(25, 80)
 	screen := C.vterm_obtain_screen(vt)
 	C.vterm_screen_reset(screen, 1)
 	C.vterm_screen_enable_altscreen(screen, 1)
-	C.vterm_screen_set_callbacks(screen, &cbs, nil)
+	C.vterm_screen_set_callbacks(screen, &cbs, unsafe.Pointer(&term))
 
-	C.vterm_input_write(vt, C.CString("lol"), 3)
-	C.vterm_input_write(vt, C.CString("test"), 4)
+	go func() {
+		for str := range term.inputStr {
+			C.vterm_input_write(vt, C.CString(str), (C.size_t)(len(str)))
+		}
+	}()
 
-	fmt.Printf("> %s %s\n", reflect.TypeOf(vt), vt)
-	fmt.Printf("> %s %s\n", reflect.TypeOf(screen), screen)
+	term.inputStr <- "lol"
+	term.inputStr <- "test"
+
+	time.Sleep(100 * time.Millisecond)
 
 	fmt.Printf("DONE\n")
 }
